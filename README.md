@@ -39,7 +39,8 @@ graph-agent "Who can help with injuries?"
 graph-agent-skeleton/
 ├── graph_agent/
 │   ├── __init__.py
-│   ├── __main__.py      # CLI 入口
+│   ├── __main__.py      # CLI 入口（默认走 Harness）
+│   ├── harness.py       # Harness：工具注册 + Session + Guardrails
 │   ├── graph.py         # 内存图：节点 / 边 / 查询辅助
 │   ├── seed.py          # 种子数据（Elena、First Aid、山脉/FOSSILIZED、烧伤等）
 │   ├── search.py        # keyword / semantic(BoW cosine) / hybrid(RRF)
@@ -48,6 +49,24 @@ graph-agent-skeleton/
 ├── run.sh
 └── README.md
 ```
+
+
+## Harness / Loop / Graph（本仓库怎么对应）
+
+| 概念 | 含义（视频/图工程） | 本仓库 |
+|------|---------------------|--------|
+| **Harness** | 模型周围的工具、记忆、护栏 | `harness.py`：`ToolRegistry` + `Session` + `Guardrails` + `Harness.run` |
+| **Loop** | 单 agent 的 reason→act→observe | `Harness.run` 一轮：护栏检查 → 选工具 → 执行 → 写入 session |
+| **Graph** | 多节点编排与共享状态 | `SurvivorGraph` 边关系 + `fanout_join_router` |
+
+`Harness` 默认会：
+
+1. **Guardrails**：拒空查询、过长查询；可配置屏蔽词与每轮最大工具调用次数  
+2. **Tools**：注册 `keyword_search` / `semantic_search` / `hybrid_search`  
+3. **Session**：把 user / assistant 轮次记在内存里（玩具级 Memory）  
+4. 再调用现有 `AgentRouter` 做选型与救援 enrich  
+
+CLI 输出第一行会带 `Harness: on | session_turns=…`。
 
 ## 图谱模型
 
@@ -103,6 +122,7 @@ Need ← skill_treats_need ← Skill ← has_skill ← Survivor
 | `keyword_search` | Spanner / 结构化过滤 + **Vertex AI Search** 关键词通道 | 精确属性、ID、关系过滤 |
 | `semantic_search`（BoW cosine） | **Vertex AI Embeddings + Vector Search** | 真实环境用文本嵌入向量，而非词袋 |
 | `hybrid_search` + RRF | Vertex AI Search **Hybrid / RRF** 或自建融合 | 关键词排序与向量排序融合 |
+| `Harness`（tools+session+guardrails） | **ADK Runner / Session / 护栏与工具注册** | 本地薄封装；Lab 里由 ADK + Agent Engine 提供 |
 | `AgentRouter` 启发式 | **ADK（Agent Development Kit）** 工具选择 / 规划 | Lab 中由 LLM Agent 选 tool、填参、多步编排 |
 | `fanout_join_router` | Spanner 多跳图查询 + Agent 编排 | 救援匹配：需求→技能→人→地点 |
 | CLI `python -m graph_agent` | Cloud Run / Agent Engine 上的 Agent 服务入口 | 本地 REPL vs 云端 API |
@@ -119,6 +139,7 @@ Need ← skill_treats_need ← Skill ← has_skill ← Survivor
 - **只依赖标准库**：便于在受限环境快速演示。
 - **语义检索是玩具级**：token BoW cosine 仅用于讲清「向量检索」接口形状。
 - **路由是规则而非 LLM**：对应 ADK 里「先有工具、再让模型选型」的教学顺序。
+- **Harness 是最小实现**：有工具注册、内存 Session、输入护栏；没有真 LLM、持久 Memory Bank。
 
 ## 许可证
 

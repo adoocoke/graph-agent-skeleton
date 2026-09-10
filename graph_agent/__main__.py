@@ -7,12 +7,23 @@ import json
 import sys
 from typing import Any, Dict, List
 
-from .router import AgentRouter, fanout_join_router
+from .harness import Harness
+from .router import fanout_join_router
 from .seed import build_seed_graph
 
 
 def format_results(payload: Dict[str, Any]) -> str:
     lines: List[str] = []
+    if payload.get("via") == "harness":
+        lines.append(
+            f"Harness: on  | session_turns={payload.get('session_turns')} "
+            f"| tools={','.join(payload.get('registered_tools') or [])}"
+        )
+    if not payload.get("ok", True):
+        lines.append(f"Query : {payload.get('query')}")
+        lines.append(f"Blocked: {payload.get('error')}")
+        return "\n".join(lines)
+
     lines.append(f"Query : {payload['query']}")
     lines.append(f"Tool  : {payload['tool']}  ({payload['reason']})")
     lines.append("")
@@ -53,7 +64,7 @@ def format_results(payload: Dict[str, Any]) -> str:
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m graph_agent",
-        description="Minimal Graph Agent: survivor graph search + heuristic router",
+        description="Minimal Graph Agent: harness (tools+session+guardrails) + graph search",
     )
     parser.add_argument(
         "query",
@@ -64,7 +75,7 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument(
         "--fanout",
         action="store_true",
-        help="Run fanout_join_router demo instead of the agent router",
+        help="Run fanout_join_router demo instead of the harness",
     )
     parser.add_argument(
         "--biome",
@@ -101,13 +112,13 @@ def main(argv: List[str] | None = None) -> int:
                 )
         return 0
 
-    router = AgentRouter(graph)
-    payload = router.run(args.query, limit=args.limit)
+    harness = Harness(graph)
+    payload = harness.run(args.query, limit=args.limit)
     if args.json:
         print(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         print(format_results(payload))
-    return 0
+    return 0 if payload.get("ok", True) else 2
 
 
 if __name__ == "__main__":
