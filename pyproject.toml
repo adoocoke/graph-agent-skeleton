@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graph-agent"
+version = "0.1.0"
+description = "Minimal in-memory Graph Agent skeleton (survivors / skills / needs / biomes)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "graph-agent-skeleton" }]
+dependencies = []
+
+[project.scripts]
+graph-agent = "graph_agent.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["graph_agent*"]
